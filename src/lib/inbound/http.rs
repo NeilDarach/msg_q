@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use axum::Router;
-use axum::routing::post;
+use axum::routing::{get,post};
 use tokio::net;
 
 use crate::domain::messages::ports::MessageService;
 use crate::inbound::http::handlers::create_message::create_message;
+use crate::inbound::http::handlers::get_message::get_message;
 
 mod handlers;
 mod responses;
@@ -65,5 +66,7 @@ impl HttpServer {
 
 
 fn api_routes<MS: MessageService>() -> Router<AppState<MS>> {
-  Router::new().route("/create", post(create_message::<MS>))
+  Router::new()
+    .route("/create", post(create_message::<MS>))
+    .route("/get/:queue_name/:uid", get(get_message::<MS>))
   }

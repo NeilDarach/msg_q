@@ -74,4 +74,18 @@ pub enum CreateMessageError {
   Unknown(#[from] anyhow::Error),
   }
 
+#[derive(Debug,Error)]
+pub enum GetMessageError {
+  NoMessage,
+  #[error(transparent)]
+  Unknown(#[from] anyhow::Error),
+  }
 
+impl Display for GetMessageError {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      GetMessageError::NoMessage => f.write_str("No Message"),
+      GetMessageError::Unknown(_) => f.write_str("Unknown"),
+    }
+  }
+}
