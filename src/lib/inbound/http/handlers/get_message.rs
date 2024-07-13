@@ -12,8 +12,9 @@ use crate::inbound::http::AppState;
 impl From<GetMessageError> for ApiError {
     fn from(e: GetMessageError) -> Self {
         match e {
-            GetMessageError::NoMessage => Self::NotFound,
-            _ => Self::InternalServerError(e.to_string()),
+            GetMessageError::NoMessage(e) => Self::NotFound(e),
+            GetMessageError::BadUuid(e) => Self::UnprocessableEntity(format!("Bad uuid {}", e)),
+            GetMessageError::Unknown(e) => Self::InternalServerError(e.to_string()),
         }
     }
 }

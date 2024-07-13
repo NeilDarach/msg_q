@@ -35,7 +35,7 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApiError {
-    NotFound,
+    NotFound(String),
     InternalServerError(String),
     UnprocessableEntity(String),
 }
@@ -74,13 +74,13 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         use ApiError::*;
         match self {
-            NotFound => {
-                tracing::error!("not found");
+            NotFound(e) => {
+                tracing::error!("reference {} not found", e);
                 (
                     StatusCode::NOT_FOUND,
                     Json(ApiResponseBody::new_error(
                         StatusCode::NOT_FOUND,
-                        "Resource not found".to_string(),
+                        format!("Resource {} not found", e),
                     )),
                 )
                     .into_response()
