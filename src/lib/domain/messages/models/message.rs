@@ -4,6 +4,35 @@ use derive_more::From;
 use thiserror::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct QueueSummary {
+    queue_name: String,
+    depth: usize,
+}
+
+impl QueueSummary {
+    pub fn new(queue_name: &QueueName, depth: usize) -> Self {
+        Self {
+            queue_name: queue_name.to_string(),
+            depth,
+        }
+    }
+
+    pub fn queue_name(&self) -> &String {
+        &self.queue_name
+    }
+
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum QueueSummaryError {
+    #[error(transparent)]
+    Unknown(#[from] anyhow::Error),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Message {
     id: uuid::Uuid,
     content: String,

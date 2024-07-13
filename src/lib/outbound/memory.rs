@@ -3,8 +3,12 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::domain::messages::models::message::{CreateMessageError, GetMessageError};
-use crate::domain::messages::models::message::{CreateMessageRequest, Message, QueueName};
+use crate::domain::messages::models::message::{
+    CreateMessageError, GetMessageError, QueueSummaryError,
+};
+use crate::domain::messages::models::message::{
+    CreateMessageRequest, Message, QueueName, QueueSummary,
+};
 use crate::domain::messages::ports::MessageRepository;
 
 #[derive(Debug, Clone)]
@@ -50,5 +54,14 @@ impl MessageRepository for Memory {
         let entry = queues.entry(req.queue_name().clone()).or_insert(Vec::new());
         entry.push(message.clone());
         Ok(message)
+    }
+
+    async fn queue_summary(&self) -> Result<Vec<QueueSummary>, QueueSummaryError> {
+        let queues = self.queues.lock().unwrap();
+
+        Ok(queues
+            .iter()
+            .map(|(k, v)| QueueSummary::new(k, v.len()))
+            .collect::<Vec<_>>())
     }
 }
