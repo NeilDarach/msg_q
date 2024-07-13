@@ -31,20 +31,20 @@ where
         &self,
         req: &CreateMessageRequest,
     ) -> Result<Message, CreateMessageError> {
-        let result = self.repo.create_message(req).await;
-        result
+        self.repo.create_message(req).await
     }
     async fn get_message(
         &self,
         queue_name: QueueName,
         id: &String,
     ) -> Result<Message, GetMessageError> {
-        let result = self.repo.get_message(queue_name, id).await;
-        result
+        self.repo.get_message(queue_name, id).await
     }
 
-    async fn queue_summary(&self) -> Result<Vec<QueueSummary>, QueueSummaryError> {
-        let result = self.repo.queue_summary().await;
-        result
+    async fn queue_summary(
+        &self,
+        queue_name: Option<QueueName>,
+    ) -> Result<Vec<QueueSummary>, QueueSummaryError> {
+        self.repo.queue_summary(queue_name).await
     }
 }

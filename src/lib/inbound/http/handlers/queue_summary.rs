@@ -1,8 +1,8 @@
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::Serialize;
 
-use crate::domain::messages::models::message::{QueueSummary, QueueSummaryError};
+use crate::domain::messages::models::message::{QueueName, QueueSummary, QueueSummaryError};
 use crate::domain::messages::ports::MessageService;
 use crate::inbound::http::errors::{ApiError, ApiSuccess};
 use crate::inbound::http::AppState;
@@ -17,10 +17,16 @@ impl From<QueueSummaryError> for ApiError {
 
 pub async fn queue_summary<MS: MessageService>(
     State(state): State<AppState<MS>>,
+    queue_name: Option<Path<String>>,
 ) -> Result<ApiSuccess<Vec<QueueSummaryResponseData>>, ApiError> {
+    let queue_name = match queue_name {
+        Some(Path(s)) => Some(QueueName::new(&s)?),
+        None => None,
+    };
+
     state
         .message_service
-        .queue_summary()
+        .queue_summary(queue_name)
         .await
         .map_err(ApiError::from)
         .map(|ref summaries| {

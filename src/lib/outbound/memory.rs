@@ -56,11 +56,15 @@ impl MessageRepository for Memory {
         Ok(message)
     }
 
-    async fn queue_summary(&self) -> Result<Vec<QueueSummary>, QueueSummaryError> {
+    async fn queue_summary(
+        &self,
+        queue_name: Option<QueueName>,
+    ) -> Result<Vec<QueueSummary>, QueueSummaryError> {
         let queues = self.queues.lock().unwrap();
 
         Ok(queues
             .iter()
+            .filter(|(k, _)| queue_name.is_none() || Some(*k) == queue_name.as_ref())
             .map(|(k, v)| QueueSummary::new(k, v.len()))
             .collect::<Vec<_>>())
     }

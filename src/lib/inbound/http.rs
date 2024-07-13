@@ -69,5 +69,6 @@ fn api_routes<MS: MessageService>() -> Router<AppState<MS>> {
     Router::new()
         .route("/create", post(create_message::<MS>))
         .route("/get/:queue_name/:uid", get(get_message::<MS>))
-        .route("/", get(queue_summary::<MS>))
+        .route("/queues", get(queue_summary::<MS>))
+        .route("/queues/:id", get(queue_summary::<MS>))
 }

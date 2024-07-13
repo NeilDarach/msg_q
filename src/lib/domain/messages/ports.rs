@@ -20,6 +20,7 @@ pub trait MessageService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn queue_summary(
         &self,
+        queue_name: Option<QueueName>,
     ) -> impl Future<Output = Result<Vec<QueueSummary>, QueueSummaryError>> + Send;
 }
 
@@ -35,5 +36,6 @@ pub trait MessageRepository: Send + Sync + Clone + 'static {
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn queue_summary(
         &self,
+        queue_name: Option<QueueName>,
     ) -> impl Future<Output = Result<Vec<QueueSummary>, QueueSummaryError>> + Send;
 }
