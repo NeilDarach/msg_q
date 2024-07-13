@@ -35,12 +35,17 @@ pub enum QueueSummaryError {
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Message {
     id: uuid::Uuid,
+    serial: usize,
     content: String,
 }
 
 impl Message {
     pub fn new(id: uuid::Uuid, content: String) -> Self {
-        Self { id, content }
+        Self {
+            id,
+            content,
+            serial: 0,
+        }
     }
 
     pub fn id(&self) -> &uuid::Uuid {
@@ -49,6 +54,13 @@ impl Message {
 
     pub fn content(&self) -> &String {
         &self.content
+    }
+
+    pub fn serial(&self) -> usize {
+        self.serial
+    }
+    pub fn set_serial(&mut self, serial: usize) {
+        self.serial = serial
     }
 }
 

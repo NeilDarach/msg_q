@@ -13,7 +13,22 @@ use crate::domain::messages::ports::MessageRepository;
 
 #[derive(Debug, Clone)]
 pub struct Memory {
-    queues: Arc<Mutex<HashMap<QueueName, VecDeque<Message>>>>,
+    queues: Arc<Mutex<HashMap<QueueName, Queue>>>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+struct Queue {
+    messages: VecDeque<Message>,
+    max_serial: usize,
+}
+
+impl Queue {
+    pub fn add_message(&mut self, mut message: Message) -> Message {
+        self.max_serial += 1;
+        message.set_serial(self.max_serial);
+        self.messages.push_back(message.clone());
+        message
+    }
 }
 
 impl Memory {
@@ -32,8 +47,8 @@ impl MessageRepository for Memory {
         if let Ok(id) = Uuid::parse_str(id) {
             let mut queues = self.queues.lock().unwrap();
             if let Some(queue) = queues.get_mut(&queue_name) {
-                if let Some(i) = queue.iter().position(|e| e.id() == &id) {
-                    let msg = queue.remove(i).unwrap();
+                if let Some(i) = queue.messages.iter().position(|e| e.id() == &id) {
+                    let msg = queue.messages.remove(i).unwrap();
                     return Ok(msg);
                 }
             }
@@ -46,7 +61,7 @@ impl MessageRepository for Memory {
     async fn get_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
         let mut queues = self.queues.lock().unwrap();
         if let Some(queue) = queues.get_mut(&queue_name) {
-            if let Some(msg) = queue.pop_front() {
+            if let Some(msg) = queue.messages.pop_front() {
                 return Ok(msg);
             }
         }
@@ -61,8 +76,8 @@ impl MessageRepository for Memory {
         if let Ok(id) = Uuid::parse_str(id) {
             let mut queues = self.queues.lock().unwrap();
             if let Some(queue) = queues.get_mut(&queue_name) {
-                if let Some(i) = queue.iter().position(|e| e.id() == &id) {
-                    let msg = queue.get(i).unwrap();
+                if let Some(i) = queue.messages.iter().position(|e| e.id() == &id) {
+                    let msg = queue.messages.get(i).unwrap();
                     return Ok(msg.clone());
                 }
             }
@@ -75,7 +90,7 @@ impl MessageRepository for Memory {
     async fn browse_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
         let mut queues = self.queues.lock().unwrap();
         if let Some(queue) = queues.get_mut(&queue_name) {
-            if let Some(msg) = queue.get(0) {
+            if let Some(msg) = queue.messages.get(0) {
                 return Ok(msg.clone());
             }
         }
@@ -91,7 +106,7 @@ impl MessageRepository for Memory {
         let content = req.content().clone();
         let message = Message::new(id, content);
         let entry = queues.entry(req.queue_name().clone()).or_default();
-        entry.push_back(message.clone());
+        entry.add_message(message.clone());
         Ok(message)
     }
 
@@ -104,7 +119,7 @@ impl MessageRepository for Memory {
         Ok(queues
             .iter()
             .filter(|(k, _)| queue_name.is_none() || Some(*k) == queue_name.as_ref())
-            .map(|(k, v)| QueueSummary::new(k, v.len()))
+            .map(|(k, v)| QueueSummary::new(k, v.messages.len()))
             .collect::<Vec<_>>())
     }
 }
