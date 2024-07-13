@@ -25,6 +25,19 @@ impl From<QueueNameEmptyError> for ApiError {
     }
 }
 
+pub async fn get_next_message<MS: MessageService>(
+    State(state): State<AppState<MS>>,
+    Path(queue_name): Path<String>,
+) -> Result<ApiSuccess<GetMessageResponseData>, ApiError> {
+    let queue_name = QueueName::new(queue_name.as_str())?;
+    state
+        .message_service
+        .get_next_message(queue_name)
+        .await
+        .map_err(ApiError::from)
+        .map(|ref message| ApiSuccess::new(StatusCode::OK, message.into()))
+}
+
 pub async fn get_message<MS: MessageService>(
     State(state): State<AppState<MS>>,
     Path((queue_name, id)): Path<(String, String)>,
@@ -33,6 +46,32 @@ pub async fn get_message<MS: MessageService>(
     state
         .message_service
         .get_message(queue_name, &id)
+        .await
+        .map_err(ApiError::from)
+        .map(|ref message| ApiSuccess::new(StatusCode::OK, message.into()))
+}
+
+pub async fn browse_next_message<MS: MessageService>(
+    State(state): State<AppState<MS>>,
+    Path(queue_name): Path<String>,
+) -> Result<ApiSuccess<GetMessageResponseData>, ApiError> {
+    let queue_name = QueueName::new(queue_name.as_str())?;
+    state
+        .message_service
+        .browse_next_message(queue_name)
+        .await
+        .map_err(ApiError::from)
+        .map(|ref message| ApiSuccess::new(StatusCode::OK, message.into()))
+}
+
+pub async fn browse_message<MS: MessageService>(
+    State(state): State<AppState<MS>>,
+    Path((queue_name, id)): Path<(String, String)>,
+) -> Result<ApiSuccess<GetMessageResponseData>, ApiError> {
+    let queue_name = QueueName::new(queue_name.as_str())?;
+    state
+        .message_service
+        .browse_message(queue_name, &id)
         .await
         .map_err(ApiError::from)
         .map(|ref message| ApiSuccess::new(StatusCode::OK, message.into()))

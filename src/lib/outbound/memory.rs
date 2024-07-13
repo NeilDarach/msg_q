@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::sync::Mutex;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use crate::domain::messages::ports::MessageRepository;
 
 #[derive(Debug, Clone)]
 pub struct Memory {
-    queues: Arc<Mutex<HashMap<QueueName, Vec<Message>>>>,
+    queues: Arc<Mutex<HashMap<QueueName, VecDeque<Message>>>>,
 }
 
 impl Memory {
@@ -27,13 +27,13 @@ impl MessageRepository for Memory {
     async fn get_message(
         &self,
         queue_name: QueueName,
-        id: &String,
+        id: &str,
     ) -> Result<Message, GetMessageError> {
         if let Ok(id) = Uuid::parse_str(id) {
             let mut queues = self.queues.lock().unwrap();
             if let Some(queue) = queues.get_mut(&queue_name) {
                 if let Some(i) = queue.iter().position(|e| e.id() == &id) {
-                    let msg = queue.remove(i);
+                    let msg = queue.remove(i).unwrap();
                     return Ok(msg);
                 }
             }
@@ -41,6 +41,45 @@ impl MessageRepository for Memory {
             return Err(GetMessageError::BadUuid(id.to_string()));
         }
         Err(GetMessageError::NoMessage(format!("{}/{}", queue_name, id)))
+    }
+
+    async fn get_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
+        let mut queues = self.queues.lock().unwrap();
+        if let Some(queue) = queues.get_mut(&queue_name) {
+            if let Some(msg) = queue.pop_front() {
+                return Ok(msg);
+            }
+        }
+        Err(GetMessageError::NoMessage(format!("{}", queue_name)))
+    }
+
+    async fn browse_message(
+        &self,
+        queue_name: QueueName,
+        id: &str,
+    ) -> Result<Message, GetMessageError> {
+        if let Ok(id) = Uuid::parse_str(id) {
+            let mut queues = self.queues.lock().unwrap();
+            if let Some(queue) = queues.get_mut(&queue_name) {
+                if let Some(i) = queue.iter().position(|e| e.id() == &id) {
+                    let msg = queue.get(i).unwrap();
+                    return Ok(msg.clone());
+                }
+            }
+        } else {
+            return Err(GetMessageError::BadUuid(id.to_string()));
+        }
+        Err(GetMessageError::NoMessage(format!("{}/{}", queue_name, id)))
+    }
+
+    async fn browse_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
+        let mut queues = self.queues.lock().unwrap();
+        if let Some(queue) = queues.get_mut(&queue_name) {
+            if let Some(msg) = queue.get(0) {
+                return Ok(msg.clone());
+            }
+        }
+        Err(GetMessageError::NoMessage(format!("{}", queue_name)))
     }
 
     async fn create_message(
@@ -51,8 +90,8 @@ impl MessageRepository for Memory {
         let mut queues = self.queues.lock().unwrap();
         let content = req.content().clone();
         let message = Message::new(id, content);
-        let entry = queues.entry(req.queue_name().clone()).or_insert(Vec::new());
-        entry.push(message.clone());
+        let entry = queues.entry(req.queue_name().clone()).or_default();
+        entry.push_back(message.clone());
         Ok(message)
     }
 

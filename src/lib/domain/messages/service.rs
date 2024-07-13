@@ -36,9 +36,25 @@ where
     async fn get_message(
         &self,
         queue_name: QueueName,
-        id: &String,
+        id: &str,
     ) -> Result<Message, GetMessageError> {
         self.repo.get_message(queue_name, id).await
+    }
+
+    async fn get_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
+        self.repo.get_next_message(queue_name).await
+    }
+
+    async fn browse_message(
+        &self,
+        queue_name: QueueName,
+        id: &str,
+    ) -> Result<Message, GetMessageError> {
+        self.repo.browse_message(queue_name, id).await
+    }
+
+    async fn browse_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
+        self.repo.browse_next_message(queue_name).await
     }
 
     async fn queue_summary(

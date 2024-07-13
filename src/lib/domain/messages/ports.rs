@@ -16,7 +16,20 @@ pub trait MessageService: Clone + Send + Sync + 'static {
     fn get_message(
         &self,
         queue_name: QueueName,
-        id: &String,
+        id: &str,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn get_next_message(
+        &self,
+        queue_name: QueueName,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn browse_message(
+        &self,
+        queue_name: QueueName,
+        id: &str,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn browse_next_message(
+        &self,
+        queue_name: QueueName,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn queue_summary(
         &self,
@@ -32,7 +45,20 @@ pub trait MessageRepository: Send + Sync + Clone + 'static {
     fn get_message(
         &self,
         queue_name: QueueName,
-        id: &String,
+        id: &str,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn get_next_message(
+        &self,
+        queue_name: QueueName,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn browse_message(
+        &self,
+        queue_name: QueueName,
+        id: &str,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn browse_next_message(
+        &self,
+        queue_name: QueueName,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn queue_summary(
         &self,

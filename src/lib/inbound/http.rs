@@ -7,7 +7,9 @@ use tokio::net;
 
 use crate::domain::messages::ports::MessageService;
 use crate::inbound::http::handlers::create_message::create_message;
-use crate::inbound::http::handlers::get_message::get_message;
+use crate::inbound::http::handlers::get_message::{
+    browse_message, browse_next_message, get_message, get_next_message,
+};
 use crate::inbound::http::handlers::queue_summary::queue_summary;
 
 mod errors;
@@ -68,7 +70,10 @@ impl HttpServer {
 fn api_routes<MS: MessageService>() -> Router<AppState<MS>> {
     Router::new()
         .route("/create", post(create_message::<MS>))
+        .route("/get/:queue_name", get(get_next_message::<MS>))
         .route("/get/:queue_name/:uid", get(get_message::<MS>))
+        .route("/browse/:queue_name", get(browse_next_message::<MS>))
+        .route("/browse/:queue_name/:uid", get(browse_message::<MS>))
         .route("/queues", get(queue_summary::<MS>))
         .route("/queues/:id", get(queue_summary::<MS>))
 }
