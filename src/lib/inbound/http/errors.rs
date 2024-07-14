@@ -80,7 +80,7 @@ impl IntoResponse for ApiError {
                     StatusCode::NOT_FOUND,
                     Json(ApiResponseBody::new_error(
                         StatusCode::NOT_FOUND,
-                        format!("Resource {} not found", e),
+                        format!("Resource not found: {}", e),
                     )),
                 )
                     .into_response()
