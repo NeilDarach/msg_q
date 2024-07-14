@@ -7,7 +7,7 @@ use crate::domain::messages::models::message::{
     CreateMessageError, GetMessageError, QueueSummaryError,
 };
 use crate::domain::messages::models::message::{
-    CreateMessageRequest, Message, QueueName, QueueSummary,
+    CreateMessageRequest, Message, Parameters, QueueName, QueueSummary,
 };
 use crate::domain::messages::ports::MessageRepository;
 
@@ -39,68 +39,94 @@ impl Memory {
 }
 
 impl Memory {
-    fn retrieve(
-        &self,
-        queue_name: QueueName,
-        id: Option<&str>,
-        remove: bool,
-    ) -> Result<Message, GetMessageError> {
-        let id = match id {
-            None => None,
-            Some(s) => {
-                Some(Uuid::parse_str(s).map_err(|_| GetMessageError::BadUuid(s.to_string()))?)
-            }
-        };
-
+    fn retrieve(&self, params: Parameters) -> Result<Message, GetMessageError> {
         let mut queues = self.queues.lock().unwrap();
         let queue = queues
-            .get_mut(&queue_name)
+            .get_mut(params.queue_name())
             .ok_or(())
-            .map_err(|_| GetMessageError::NoMessage(format!("no queue {}", queue_name)))?;
+            .map_err(|_| GetMessageError::NoMessage(format!("no queue {}", params.queue_name())))?;
         let idx = queue
             .messages
             .iter()
-            .position(|e| id.is_none() || Some(*e.id()) == id)
+            .position(|e| {
+                (e.is_available() || (e.is_reserved() && params.id().is_some()))
+                    && (params.id().is_none() || Some(*e.id()) == params.id())
+            })
             .ok_or(())
             .map_err(|_| {
                 GetMessageError::NoMessage(format!(
                     "{}/{}",
-                    queue_name,
-                    id.map(|u| u.to_string()).unwrap_or("<any>".to_string())
+                    params.queue_name(),
+                    params
+                        .id()
+                        .map(|u| u.to_string())
+                        .unwrap_or("<any>".to_string())
                 ))
             })?;
         //tracing::info!("removing: {}", remove);
-        if remove {
-            Ok(queue.messages.remove(idx).unwrap())
+        let msg = if params.remove() {
+            queue.messages.remove(idx).unwrap()
         } else {
-            Ok(queue.messages.get(idx).cloned().unwrap())
-        }
+            let msg = queue.messages.get_mut(idx).unwrap();
+            msg.set_reservation(params.reservation());
+            msg.clone()
+        };
+        Ok(msg)
     }
 }
 
 impl MessageRepository for Memory {
-    async fn get_message(
-        &self,
-        queue_name: QueueName,
-        id: &str,
-    ) -> Result<Message, GetMessageError> {
-        self.retrieve(queue_name, Some(id), true)
+    async fn get_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
+        params.needs_id()?;
+        if !params.remove() {
+            return Err(GetMessageError::InvalidParameter("remove".to_string()));
+        }
+        self.retrieve(params)
     }
 
-    async fn get_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
-        self.retrieve(queue_name, None, true)
+    async fn get_next_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
+        if !params.remove() {
+            return Err(GetMessageError::InvalidParameter("remove".to_string()));
+        }
+        self.retrieve(params)
     }
 
-    async fn browse_message(
-        &self,
-        queue_name: QueueName,
-        id: &str,
-    ) -> Result<Message, GetMessageError> {
-        self.retrieve(queue_name, Some(id), false)
+    async fn browse_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
+        params.needs_id()?;
+        if params.remove() {
+            return Err(GetMessageError::InvalidParameter("remove".to_string()));
+        }
+        self.retrieve(params)
     }
 
-    async fn browse_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
-        self.retrieve(queue_name, None, false)
+    async fn browse_next_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
+        if params.remove() {
+            return Err(GetMessageError::InvalidParameter("remove".to_string()));
+        }
+        self.retrieve(params)
+    }
+
+    async fn reserve_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
+        params.needs_id()?;
+        params.needs_reservation()?;
+        if params.remove() {
+            return Err(GetMessageError::InvalidParameter("remove".to_string()));
+        }
+        self.retrieve(params)
+    }
+    async fn reserve_next_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
+        params.needs_reservation()?;
+        if params.remove() {
+            return Err(GetMessageError::InvalidParameter("remove".to_string()));
+        }
+        self.retrieve(params)
+    }
+    async fn confirm_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
+        params.needs_id()?;
+        if !params.remove() {
+            return Err(GetMessageError::InvalidParameter("remove".to_string()));
+        }
+        self.retrieve(params)
     }
 
     async fn create_message(

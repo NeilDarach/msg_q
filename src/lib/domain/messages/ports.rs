@@ -1,6 +1,8 @@
 use std::future::Future;
 
-use crate::domain::messages::models::message::{CreateMessageRequest, Message, QueueSummary};
+use crate::domain::messages::models::message::{
+    CreateMessageRequest, Message, Parameters, QueueSummary,
+};
 
 #[allow(unused_imports)]
 use crate::domain::messages::models::message::QueueName;
@@ -15,21 +17,31 @@ pub trait MessageService: Clone + Send + Sync + 'static {
     ) -> impl Future<Output = Result<Message, CreateMessageError>> + Send;
     fn get_message(
         &self,
-        queue_name: QueueName,
-        id: &str,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn get_next_message(
         &self,
-        queue_name: QueueName,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn browse_message(
         &self,
-        queue_name: QueueName,
-        id: &str,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn browse_next_message(
         &self,
-        queue_name: QueueName,
+        param: Parameters,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn reserve_message(
+        &self,
+        param: Parameters,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn reserve_next_message(
+        &self,
+        param: Parameters,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn confirm_message(
+        &self,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn queue_summary(
         &self,
@@ -44,21 +56,31 @@ pub trait MessageRepository: Send + Sync + Clone + 'static {
     ) -> impl Future<Output = Result<Message, CreateMessageError>> + Send;
     fn get_message(
         &self,
-        queue_name: QueueName,
-        id: &str,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn get_next_message(
         &self,
-        queue_name: QueueName,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn browse_message(
         &self,
-        queue_name: QueueName,
-        id: &str,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn browse_next_message(
         &self,
-        queue_name: QueueName,
+        param: Parameters,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn reserve_message(
+        &self,
+        param: Parameters,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn reserve_next_message(
+        &self,
+        param: Parameters,
+    ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
+    fn confirm_message(
+        &self,
+        param: Parameters,
     ) -> impl Future<Output = Result<Message, GetMessageError>> + Send;
     fn queue_summary(
         &self,

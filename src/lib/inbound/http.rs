@@ -8,7 +8,8 @@ use tokio::net;
 use crate::domain::messages::ports::MessageService;
 use crate::inbound::http::handlers::create_message::create_message;
 use crate::inbound::http::handlers::get_message::{
-    browse_message, browse_next_message, get_message, get_next_message,
+    browse_message, browse_next_message, confirm_message, get_message, get_next_message,
+    reserve_message, reserve_next_message,
 };
 use crate::inbound::http::handlers::queue_summary::queue_summary;
 
@@ -74,6 +75,9 @@ fn api_routes<MS: MessageService>() -> Router<AppState<MS>> {
         .route("/get/:queue_name/:uid", get(get_message::<MS>))
         .route("/browse/:queue_name", get(browse_next_message::<MS>))
         .route("/browse/:queue_name/:uid", get(browse_message::<MS>))
+        .route("/reserve/:queue_name", get(reserve_next_message::<MS>))
+        .route("/reserve/:queue_name/:uid", get(reserve_message::<MS>))
+        .route("/confirm/:queue_name/:uid", get(confirm_message::<MS>))
         .route("/queues", get(queue_summary::<MS>))
         .route("/queues/:id", get(queue_summary::<MS>))
 }

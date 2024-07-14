@@ -2,7 +2,7 @@ use crate::domain::messages::models::message::{
     CreateMessageError, GetMessageError, QueueSummaryError,
 };
 use crate::domain::messages::models::message::{
-    CreateMessageRequest, Message, QueueName, QueueSummary,
+    CreateMessageRequest, Message, Parameters, QueueName, QueueSummary,
 };
 use crate::domain::messages::ports::{MessageRepository, MessageService};
 
@@ -33,28 +33,32 @@ where
     ) -> Result<Message, CreateMessageError> {
         self.repo.create_message(req).await
     }
-    async fn get_message(
-        &self,
-        queue_name: QueueName,
-        id: &str,
-    ) -> Result<Message, GetMessageError> {
-        self.repo.get_message(queue_name, id).await
+    async fn get_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
+        self.repo.get_message(param).await
     }
 
-    async fn get_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
-        self.repo.get_next_message(queue_name).await
+    async fn get_next_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
+        self.repo.get_next_message(param).await
     }
 
-    async fn browse_message(
-        &self,
-        queue_name: QueueName,
-        id: &str,
-    ) -> Result<Message, GetMessageError> {
-        self.repo.browse_message(queue_name, id).await
+    async fn browse_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
+        self.repo.browse_message(param).await
     }
 
-    async fn browse_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
-        self.repo.browse_next_message(queue_name).await
+    async fn browse_next_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
+        self.repo.browse_next_message(param).await
+    }
+
+    async fn reserve_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
+        self.repo.reserve_message(param).await
+    }
+
+    async fn reserve_next_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
+        self.repo.reserve_next_message(param).await
+    }
+
+    async fn confirm_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
+        self.repo.confirm_message(param).await
     }
 
     async fn queue_summary(
