@@ -38,34 +38,57 @@ impl Memory {
     }
 }
 
+impl Memory {
+    fn retrieve(
+        &self,
+        queue_name: QueueName,
+        id: Option<&str>,
+        remove: bool,
+    ) -> Result<Message, GetMessageError> {
+        let id = match id {
+            None => None,
+            Some(s) => {
+                Some(Uuid::parse_str(s).map_err(|_| GetMessageError::BadUuid(s.to_string()))?)
+            }
+        };
+
+        let mut queues = self.queues.lock().unwrap();
+        let queue = queues
+            .get_mut(&queue_name)
+            .ok_or(())
+            .map_err(|_| GetMessageError::NoMessage(format!("no queue {}", queue_name)))?;
+        let idx = queue
+            .messages
+            .iter()
+            .position(|e| id.is_none() || Some(*e.id()) == id)
+            .ok_or(())
+            .map_err(|_| {
+                GetMessageError::NoMessage(format!(
+                    "{}/{}",
+                    queue_name,
+                    id.map(|u| u.to_string()).unwrap_or("<any>".to_string())
+                ))
+            })?;
+        //tracing::info!("removing: {}", remove);
+        if remove {
+            Ok(queue.messages.remove(idx).unwrap())
+        } else {
+            Ok(queue.messages.get(idx).cloned().unwrap())
+        }
+    }
+}
+
 impl MessageRepository for Memory {
     async fn get_message(
         &self,
         queue_name: QueueName,
         id: &str,
     ) -> Result<Message, GetMessageError> {
-        if let Ok(id) = Uuid::parse_str(id) {
-            let mut queues = self.queues.lock().unwrap();
-            if let Some(queue) = queues.get_mut(&queue_name) {
-                if let Some(i) = queue.messages.iter().position(|e| e.id() == &id) {
-                    let msg = queue.messages.remove(i).unwrap();
-                    return Ok(msg);
-                }
-            }
-        } else {
-            return Err(GetMessageError::BadUuid(id.to_string()));
-        }
-        Err(GetMessageError::NoMessage(format!("{}/{}", queue_name, id)))
+        self.retrieve(queue_name, Some(id), true)
     }
 
     async fn get_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
-        let mut queues = self.queues.lock().unwrap();
-        if let Some(queue) = queues.get_mut(&queue_name) {
-            if let Some(msg) = queue.messages.pop_front() {
-                return Ok(msg);
-            }
-        }
-        Err(GetMessageError::NoMessage(format!("{}", queue_name)))
+        self.retrieve(queue_name, None, true)
     }
 
     async fn browse_message(
@@ -73,28 +96,11 @@ impl MessageRepository for Memory {
         queue_name: QueueName,
         id: &str,
     ) -> Result<Message, GetMessageError> {
-        if let Ok(id) = Uuid::parse_str(id) {
-            let mut queues = self.queues.lock().unwrap();
-            if let Some(queue) = queues.get_mut(&queue_name) {
-                if let Some(i) = queue.messages.iter().position(|e| e.id() == &id) {
-                    let msg = queue.messages.get(i).unwrap();
-                    return Ok(msg.clone());
-                }
-            }
-        } else {
-            return Err(GetMessageError::BadUuid(id.to_string()));
-        }
-        Err(GetMessageError::NoMessage(format!("{}/{}", queue_name, id)))
+        self.retrieve(queue_name, Some(id), false)
     }
 
     async fn browse_next_message(&self, queue_name: QueueName) -> Result<Message, GetMessageError> {
-        let mut queues = self.queues.lock().unwrap();
-        if let Some(queue) = queues.get_mut(&queue_name) {
-            if let Some(msg) = queue.messages.get(0) {
-                return Ok(msg.clone());
-            }
-        }
-        Err(GetMessageError::NoMessage(format!("{}", queue_name)))
+        self.retrieve(queue_name, None, false)
     }
 
     async fn create_message(
