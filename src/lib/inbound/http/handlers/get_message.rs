@@ -156,3 +156,171 @@ impl From<&Message> for GetMessageResponseData {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::messages::models::message::{
+        CreateMessageError, QueueName, QueueSummary, QueueSummaryError,
+    };
+    use anyhow::anyhow;
+    use std::mem;
+    use std::sync::{Arc, Mutex};
+    use uuid::Uuid;
+
+    #[derive(Clone)]
+    struct MockMessageService {
+        create_message_result: Arc<Mutex<Option<Result<Message, CreateMessageError>>>>,
+        get_message_result: Arc<Mutex<Option<Result<Message, GetMessageError>>>>,
+        queue_summary_result: Arc<Mutex<Option<Result<Vec<QueueSummary>, QueueSummaryError>>>>,
+    }
+
+    impl MockMessageService {
+        pub fn new_create(res: Result<Message, CreateMessageError>) -> Self {
+            Self {
+                create_message_result: Arc::new(Mutex::new(Some(res))),
+                get_message_result: Arc::new(Mutex::new(None)),
+                queue_summary_result: Arc::new(Mutex::new(None)),
+            }
+        }
+        pub fn new_get(res: Result<Message, GetMessageError>) -> Self {
+            Self {
+                create_message_result: Arc::new(Mutex::new(None)),
+                get_message_result: Arc::new(Mutex::new(Some(res))),
+                queue_summary_result: Arc::new(Mutex::new(None)),
+            }
+        }
+        pub fn new_summary(res: Result<Vec<QueueSummary>, QueueSummaryError>) -> Self {
+            Self {
+                create_message_result: Arc::new(Mutex::new(None)),
+                get_message_result: Arc::new(Mutex::new(None)),
+                queue_summary_result: Arc::new(Mutex::new(Some(res))),
+            }
+        }
+
+        pub fn create(&self) -> Result<Message, CreateMessageError> {
+            let mut guard = self.create_message_result.lock();
+            let mut result = Err(CreateMessageError::Unknown(anyhow!("substitute error")));
+            let t = guard.as_deref_mut().unwrap().as_mut().unwrap();
+            mem::swap(t, &mut result);
+
+            result
+        }
+        pub fn get(&self) -> Result<Message, GetMessageError> {
+            let mut guard = self.get_message_result.lock();
+            let mut result = Err(GetMessageError::Unknown(anyhow!("substitute error")));
+            let t = guard.as_deref_mut().unwrap().as_mut().unwrap();
+            mem::swap(t, &mut result);
+
+            result
+        }
+        pub fn summary(&self) -> Result<Vec<QueueSummary>, QueueSummaryError> {
+            let mut guard = self.queue_summary_result.lock();
+            let mut result = Err(QueueSummaryError::Unknown(anyhow!("substitute error")));
+            let t = guard.as_deref_mut().unwrap().as_mut().unwrap();
+            mem::swap(t, &mut result);
+
+            result
+        }
+    }
+
+    impl MessageService for MockMessageService {
+        async fn create_message(
+            &self,
+            _req: &crate::domain::messages::models::message::CreateMessageRequest,
+        ) -> Result<Message, CreateMessageError> {
+            self.create()
+        }
+
+        async fn get_message(
+            &self,
+            _param: crate::domain::messages::models::message::Parameters,
+        ) -> Result<Message, GetMessageError> {
+            self.get()
+        }
+
+        async fn get_next_message(
+            &self,
+            _param: crate::domain::messages::models::message::Parameters,
+        ) -> Result<Message, GetMessageError> {
+            self.get()
+        }
+
+        async fn browse_message(
+            &self,
+            _param: crate::domain::messages::models::message::Parameters,
+        ) -> Result<Message, GetMessageError> {
+            self.get()
+        }
+
+        async fn browse_next_message(
+            &self,
+            _param: crate::domain::messages::models::message::Parameters,
+        ) -> Result<Message, GetMessageError> {
+            self.get()
+        }
+
+        async fn reserve_message(
+            &self,
+            _param: crate::domain::messages::models::message::Parameters,
+        ) -> Result<Message, GetMessageError> {
+            self.get()
+        }
+
+        async fn reserve_next_message(
+            &self,
+            _param: crate::domain::messages::models::message::Parameters,
+        ) -> Result<Message, GetMessageError> {
+            self.get()
+        }
+
+        async fn confirm_message(
+            &self,
+            _param: crate::domain::messages::models::message::Parameters,
+        ) -> Result<Message, GetMessageError> {
+            self.get()
+        }
+
+        async fn queue_summary(
+            &self,
+            _queue_name: Option<QueueName>,
+        ) -> Result<Vec<QueueSummary>, QueueSummaryError> {
+            self.summary()
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_message_success() {
+        let queue_name = QueueName::new("test").unwrap();
+        let content = "A String".to_string();
+        let message_id = Uuid::new_v4();
+        let service =
+            MockMessageService::new_get(Ok(Message::new(message_id.clone(), content.clone())));
+        let state = axum::extract::State(AppState {
+            message_service: Arc::new(service),
+        });
+        let expected = ApiSuccess::new(
+            StatusCode::OK,
+            GetMessageResponseData {
+                id: message_id.to_string(),
+                content: content.clone(),
+            },
+        );
+
+        let path = axum::extract::Path(("test".to_string(), message_id.to_string()));
+
+        let actual = get_message(state, path).await;
+        assert!(
+            actual.is_ok(),
+            "expected create_message to succeed, but got {:?}",
+            actual
+        );
+
+        let actual = actual.unwrap();
+        assert_eq!(
+            actual, expected,
+            "expected ApiSuccess {:?}, but got {:?}",
+            expected, actual
+        )
+    }
+}
