@@ -1,8 +1,8 @@
 use crate::domain::messages::models::message::{
-    CreateMessageError, GetMessageError, QueueSummaryError,
+    CreateMessageError, GetMessageError, QueueListError,
 };
 use crate::domain::messages::models::message::{
-    CreateMessageRequest, Message, Parameters, QueueName, QueueSummary,
+    CreateMessageRequest, GetMessageOptions, Message, QueueList, QueueName,
 };
 use crate::domain::messages::ports::{MessageRepository, MessageService};
 
@@ -29,42 +29,17 @@ where
 {
     async fn create_message(
         &self,
+        queue_name: QueueName,
         req: &CreateMessageRequest,
     ) -> Result<Message, CreateMessageError> {
-        self.repo.create_message(req).await
-    }
-    async fn get_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
-        self.repo.get_message(param).await
+        self.repo.create_message(queue_name, req).await
     }
 
-    async fn get_next_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
-        self.repo.get_next_message(param).await
+    async fn get_message(&self, gmo: GetMessageOptions) -> Result<Message, GetMessageError> {
+        self.repo.get_message(gmo).await
     }
 
-    async fn browse_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
-        self.repo.browse_message(param).await
-    }
-
-    async fn browse_next_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
-        self.repo.browse_next_message(param).await
-    }
-
-    async fn reserve_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
-        self.repo.reserve_message(param).await
-    }
-
-    async fn reserve_next_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
-        self.repo.reserve_next_message(param).await
-    }
-
-    async fn confirm_message(&self, param: Parameters) -> Result<Message, GetMessageError> {
-        self.repo.confirm_message(param).await
-    }
-
-    async fn queue_summary(
-        &self,
-        queue_name: Option<QueueName>,
-    ) -> Result<Vec<QueueSummary>, QueueSummaryError> {
-        self.repo.queue_summary(queue_name).await
+    async fn queue_list(&self) -> Result<QueueList, QueueListError> {
+        self.repo.queue_list().await
     }
 }

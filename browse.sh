@@ -8,4 +8,4 @@ else
 fi
 
 
-curl "http://localhost:8000/api/$1?action=get${mid}" 
+curl "http://localhost:8000/api/$1?action=browse${mid}" 

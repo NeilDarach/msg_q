@@ -4,10 +4,10 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::domain::messages::models::message::{
-    CreateMessageError, GetMessageError, QueueSummaryError,
+    CreateMessageError, GetMessageError, QueueListError,
 };
 use crate::domain::messages::models::message::{
-    CreateMessageRequest, Message, Parameters, QueueName, QueueSummary,
+    CreateMessageRequest, GetMessageAction, GetMessageOptions, Message, QueueList, QueueName,
 };
 use crate::domain::messages::ports::MessageRepository;
 
@@ -25,7 +25,7 @@ struct Queue {
 impl Queue {
     pub fn add_message(&mut self, mut message: Message) -> Message {
         self.max_serial += 1;
-        message.set_serial(self.max_serial);
+        message.set_cursor(self.max_serial);
         self.messages.push_back(message.clone());
         message
     }
@@ -36,122 +36,67 @@ impl Memory {
         let queues = Arc::new(Mutex::new(HashMap::new()));
         Ok(Self { queues })
     }
-}
 
-impl Memory {
-    fn retrieve(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        let mut queues = self.queues.lock().unwrap();
-        let queue = queues
-            .get_mut(params.queue_name())
-            .ok_or(())
-            .map_err(|_| GetMessageError::NoMessage(format!("no queue {}", params.queue_name())))?;
-        let idx = queue
-            .messages
-            .iter()
-            .position(|e| {
-                (e.is_available() || (e.is_reserved() && params.id().is_some()))
-                    && (params.id().is_none() || Some(*e.id()) == params.id())
-            })
-            .ok_or(())
-            .map_err(|_| {
-                GetMessageError::NoMessage(format!(
-                    "{}/{}",
-                    params.queue_name(),
-                    params
-                        .id()
-                        .map(|u| u.to_string())
-                        .unwrap_or("<any>".to_string())
-                ))
-            })?;
-        //tracing::info!("removing: {}", remove);
-        let msg = if params.remove() {
-            queue.messages.remove(idx).unwrap()
-        } else {
-            let msg = queue.messages.get_mut(idx).unwrap();
-            msg.set_reservation(params.reservation());
-            msg.clone()
-        };
-        Ok(msg)
+    fn get_message(&self, gmo: &GetMessageOptions, queue: &mut Queue, idx: usize) -> Message {
+        match gmo.action() {
+            GetMessageAction::Browse => queue.messages.get(idx).unwrap().clone(),
+            GetMessageAction::Get => queue.messages.remove(idx).unwrap(),
+            GetMessageAction::Confirm => queue.messages.remove(idx).unwrap(),
+            GetMessageAction::Reserve => {
+                let msg = queue.messages.get_mut(idx).unwrap();
+                msg.set_reservation(gmo.reservation());
+                msg.clone()
+            }
+            GetMessageAction::Return => {
+                let msg = queue.messages.get_mut(idx).unwrap();
+                msg.remove_reservation();
+                msg.clone()
+            }
+            GetMessageAction::Query => todo!(),
+        }
     }
 }
 
 impl MessageRepository for Memory {
-    async fn get_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        params.needs_id()?;
-        if !params.remove() {
-            return Err(GetMessageError::InvalidParameter("remove".to_string()));
-        }
-        self.retrieve(params)
-    }
+    async fn get_message(&self, gmo: GetMessageOptions) -> Result<Message, GetMessageError> {
+        let mut queues = self.queues.lock().unwrap();
+        let queue = queues
+            .get_mut(gmo.queue_name())
+            .ok_or(())
+            .map_err(|_| GetMessageError::NoMessage(format!("no queue {}", gmo.queue_name())))?;
+        let idx = queue
+            .messages
+            .iter()
+            .position(|e| gmo.matches(e))
+            .ok_or(())
+            .map_err(|_| GetMessageError::NoMessage(format!("{}", gmo.queue_name(),)))?;
+        //tracing::info!("removing: {}", remove);
 
-    async fn get_next_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        if !params.remove() {
-            return Err(GetMessageError::InvalidParameter("remove".to_string()));
-        }
-        self.retrieve(params)
-    }
-
-    async fn browse_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        params.needs_id()?;
-        if params.remove() {
-            return Err(GetMessageError::InvalidParameter("remove".to_string()));
-        }
-        self.retrieve(params)
-    }
-
-    async fn browse_next_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        if params.remove() {
-            return Err(GetMessageError::InvalidParameter("remove".to_string()));
-        }
-        self.retrieve(params)
-    }
-
-    async fn reserve_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        params.needs_id()?;
-        params.needs_reservation()?;
-        if params.remove() {
-            return Err(GetMessageError::InvalidParameter("remove".to_string()));
-        }
-        self.retrieve(params)
-    }
-    async fn reserve_next_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        params.needs_reservation()?;
-        if params.remove() {
-            return Err(GetMessageError::InvalidParameter("remove".to_string()));
-        }
-        self.retrieve(params)
-    }
-    async fn confirm_message(&self, params: Parameters) -> Result<Message, GetMessageError> {
-        params.needs_id()?;
-        if !params.remove() {
-            return Err(GetMessageError::InvalidParameter("remove".to_string()));
-        }
-        self.retrieve(params)
+        Ok(self.get_message(&gmo, queue, idx))
     }
 
     async fn create_message(
         &self,
+        queue_name: QueueName,
         req: &CreateMessageRequest,
     ) -> Result<Message, CreateMessageError> {
-        let id = Uuid::new_v4();
+        let mid = Uuid::new_v4();
         let mut queues = self.queues.lock().unwrap();
         let content = req.content().clone();
-        let message = Message::new(id, content);
-        let entry = queues.entry(req.queue_name().clone()).or_default();
+        let message = Message::new(mid, None, content);
+        let entry = queues.entry(queue_name.clone()).or_default();
         entry.add_message(message.clone());
         Ok(message)
     }
 
-    async fn queue_summary(
-        &self,
-        queue_name: Option<QueueName>,
-    ) -> Result<Vec<QueueSummary>, QueueSummaryError> {
+    async fn queue_list(&self) -> Result<QueueList, QueueListError> {
         let queues = self.queues.lock().unwrap();
 
-        Ok(queues
-            .iter()
-            .filter(|(k, _)| queue_name.is_none() || Some(*k) == queue_name.as_ref())
-            .map(|(k, v)| QueueSummary::new(k, v.messages.len()))
-            .collect::<Vec<_>>())
+        Ok(QueueList(
+            queues
+                .iter()
+                .map(|(k, _)| k.to_string())
+                .collect::<Vec<_>>(),
+        ))
     }
 }
