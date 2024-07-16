@@ -218,6 +218,13 @@ impl QueueSummary {
 pub enum QueueSummaryError {
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
+    NoQueue(String),
+}
+
+impl Display for QueueSummaryError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("QueueSummaryError")
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

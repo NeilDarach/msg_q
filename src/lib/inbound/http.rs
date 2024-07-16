@@ -7,7 +7,7 @@ use tokio::net;
 
 use crate::domain::messages::ports::MessageService;
 use crate::inbound::http::handlers::create_message::create_message;
-use crate::inbound::http::handlers::get_message::get_message;
+use crate::inbound::http::handlers::get_message::{get_message, get_message_mid};
 use crate::inbound::http::handlers::queue_list::queue_list;
 
 mod errors;
@@ -70,5 +70,5 @@ fn api_routes<MS: MessageService>() -> Router<AppState<MS>> {
         .route("/", get(queue_list::<MS>))
         .route("/:queue_name", post(create_message::<MS>))
         .route("/:queue_name", get(get_message::<MS>))
-        .route("/:queue_name/:uid", get(get_message::<MS>))
+        .route("/:queue_name/:uid", get(get_message_mid::<MS>))
 }

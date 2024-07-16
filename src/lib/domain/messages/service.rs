@@ -2,7 +2,8 @@ use crate::domain::messages::models::message::{
     CreateMessageError, GetMessageError, QueueListError,
 };
 use crate::domain::messages::models::message::{
-    CreateMessageRequest, GetMessageOptions, Message, QueueList, QueueName,
+    CreateMessageRequest, GetMessageOptions, Message, QueueList, QueueName, QueueSummary,
+    QueueSummaryError,
 };
 use crate::domain::messages::ports::{MessageRepository, MessageService};
 
@@ -37,6 +38,9 @@ where
 
     async fn get_message(&self, gmo: GetMessageOptions) -> Result<Message, GetMessageError> {
         self.repo.get_message(gmo).await
+    }
+    async fn get_info(&self, gmo: GetMessageOptions) -> Result<QueueSummary, QueueSummaryError> {
+        self.repo.get_info(gmo).await
     }
 
     async fn queue_list(&self) -> Result<QueueList, QueueListError> {

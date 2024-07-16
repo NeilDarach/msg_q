@@ -22,5 +22,8 @@ pub async fn queue_list<MS: MessageService>(
         .queue_list()
         .await
         .map_err(ApiError::from)
-        .map(|ref list| ApiSuccess::new(StatusCode::OK, list.clone()))
+        .map(|ref mut list| {
+            list.0.sort();
+            ApiSuccess::new(StatusCode::OK, list.clone())
+        })
 }

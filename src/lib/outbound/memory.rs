@@ -4,10 +4,11 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::domain::messages::models::message::{
-    CreateMessageError, GetMessageError, QueueListError,
+    CreateMessageError, GetMessageError, QueueListError, QueueSummaryError,
 };
 use crate::domain::messages::models::message::{
     CreateMessageRequest, GetMessageAction, GetMessageOptions, Message, QueueList, QueueName,
+    QueueSummary,
 };
 use crate::domain::messages::ports::MessageRepository;
 
@@ -98,5 +99,14 @@ impl MessageRepository for Memory {
                 .map(|(k, _)| k.to_string())
                 .collect::<Vec<_>>(),
         ))
+    }
+
+    async fn get_info(&self, gmo: GetMessageOptions) -> Result<QueueSummary, QueueSummaryError> {
+        let queues = self.queues.lock().unwrap();
+        let queue = queues
+            .get(gmo.queue_name())
+            .ok_or(())
+            .map_err(|_| QueueSummaryError::NoQueue(format!("no queue {}", gmo.queue_name())))?;
+        Ok(QueueSummary::new(gmo.queue_name(), queue.messages.len()))
     }
 }
