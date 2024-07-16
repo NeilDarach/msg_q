@@ -58,6 +58,8 @@ impl GetMessageAction {
             Self::Reserve => gmo.needs_reservation()?,
             Self::Confirm => gmo.needs_mid()?,
             Self::Return => gmo.needs_mid()?,
+            Self::Query => gmo.no_reservation()?,
+            Self::Browse => gmo.no_reservation()?,
             _ => {}
         }
         Ok(())
@@ -91,6 +93,16 @@ impl GetMessageOptions {
         self.mid
             .ok_or(GetMessageError::MissingParameter("id".to_string()))
             .map(|_| ())
+    }
+
+    pub fn no_reservation(&self) -> Result<(), GetMessageError> {
+        if self.reservation.is_some() {
+            Err(GetMessageError::InvalidParameter(
+                "reservation_seconds".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn needs_reservation(&self) -> Result<(), GetMessageError> {

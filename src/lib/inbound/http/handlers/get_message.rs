@@ -169,7 +169,7 @@ mod tests {
             _queue_name: QueueName,
             _req: &CreateMessageRequest,
         ) -> Result<Message, CreateMessageError> {
-            todo!()
+            unreachable!()
         }
 
         async fn get_message(&self, _param: GetMessageOptions) -> Result<Message, GetMessageError> {
@@ -177,13 +177,13 @@ mod tests {
         }
 
         async fn queue_list(&self) -> Result<QueueList, QueueListError> {
-            todo!()
+            unreachable!()
         }
         async fn get_info(
             &self,
             _param: GetMessageOptions,
         ) -> Result<QueueSummary, QueueSummaryError> {
-            todo!()
+            unreachable!()
         }
     }
 
@@ -191,11 +191,7 @@ mod tests {
     async fn test_get_message_success() {
         let content = "A String".to_string();
         let message_id = Uuid::new_v4();
-        let service =
-            MockMessageService::new_get(Ok(Message::new(message_id, None, content.clone())));
-        let state = axum::extract::State(AppState {
-            message_service: Arc::new(service),
-        });
+        let response = Ok(Message::new(message_id, None, content.clone()));
         let expected = ApiSuccess::new(
             StatusCode::OK,
             GetMessageReturnType::Message(GetMessageResponseData {
@@ -205,13 +201,77 @@ mod tests {
                 content: content.clone(),
             }),
         );
-
-        let path = axum::extract::Path("test".to_string());
-        let gmo = serde_json::from_str(r#"{"action":"browse"}"#).unwrap();
-
-        let actual = get_message(state, path, axum::extract::Query(gmo))
+        let actual = get("test", r#"{"action":"browse"}"#, response)
             .await
             .unwrap();
+
         assert_eq!(actual, expected)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_message_bad_mid() {
+        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
+        let expected = ApiError::UnprocessableEntity("Bad parameter mid".to_string());
+        let actual = get("test", r#"{"action":"browse","mid":"xxx"}"#, response).await;
+        assert_eq!(actual, Err(expected));
+
+        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
+        let actual = get(
+            "test",
+            r#"{"action":"browse","mid":"61fb8b36-c7e6-4a34-af8a-011a73f065f0"}"#,
+            response,
+        )
+        .await;
+        assert!(actual.is_ok(), "{:?}", actual);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_message_bad_reservation() {
+        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
+        let expected =
+            ApiError::UnprocessableEntity("Bad parameter reservation_seconds".to_string());
+        let actual = get(
+            "test",
+            r#"{"action":"get","reservation_seconds":"xxx"}"#,
+            response,
+        )
+        .await;
+        assert_eq!(actual, Err(expected));
+
+        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
+        let expected =
+            ApiError::UnprocessableEntity("Bad parameter reservation_seconds".to_string());
+        let actual = get(
+            "test",
+            r#"{"action":"browse","reservation_seconds":"10"}"#,
+            response,
+        )
+        .await;
+        assert_eq!(actual, Err(expected));
+
+        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
+        let actual = get(
+            "test",
+            r#"{"action":"get","reservation_seconds":"10"}"#,
+            response,
+        )
+        .await;
+        assert!(actual.is_ok(), "{:?}", actual);
+    }
+
+    async fn get(
+        path: &str,
+        gmo: &str,
+        response: Result<Message, GetMessageError>,
+    ) -> Result<ApiSuccess<GetMessageReturnType>, ApiError> {
+        let service = MockMessageService::new_get(response);
+        let state = axum::extract::State(AppState {
+            message_service: Arc::new(service),
+        });
+
+        let path = axum::extract::Path(path.to_string());
+        let gmo = serde_json::from_str(gmo).unwrap();
+
+        get_message(state, path, axum::extract::Query(gmo)).await
     }
 }
