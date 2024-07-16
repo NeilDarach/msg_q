@@ -110,3 +110,31 @@ impl MessageRepository for Memory {
         Ok(QueueSummary::new(gmo.queue_name(), queue.messages.len()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_create_store() {
+        let store = Memory::new().await;
+        assert!(store.is_ok(), "{:?}", store);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_empty_store() {
+        let store = Memory::new().await.unwrap();
+        let queue_list = store.queue_list().await.unwrap();
+        assert!(queue_list.0.is_empty(), "{:?}", queue_list);
+
+        let gmo = serde_json::from_str::<HashMap<String, String>>(
+            r#"{"action":"query","queue_name":"test"}"#,
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+        let summary = store.get_info(gmo).await;
+        assert!(summary.is_err(), "{:?}", summary);
+    }
+}
