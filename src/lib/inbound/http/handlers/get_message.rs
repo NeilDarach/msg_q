@@ -1,6 +1,5 @@
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use std::collections::HashMap;
 
@@ -64,20 +63,18 @@ pub async fn get_message<MS: MessageService>(
     State(state): State<AppState<MS>>,
     Path(queue_name): Path<String>,
     Query(mut params): Query<HashMap<String, String>>,
-) -> Result<Response, ApiError> {
+) -> Result<ApiSuccess<GetMessageReturnType>, ApiError> {
     params.insert("queue_name".to_string(), queue_name);
     let params: GetMessageOptions = params.try_into()?;
     if params.action() == GetMessageAction::Query {
-        let ret = state
+        return state
             .message_service
             .get_info(params)
             .await
             .map_err(ApiError::from)
-            .map(|ref message| {
-                let message: QueueSummaryResponseData = message.into();
-                ApiSuccess::new(StatusCode::OK, message)
+            .map(|ref info| {
+                ApiSuccess::new(StatusCode::OK, GetMessageReturnType::Info(info.into()))
             });
-        return ret.map(|r| r.into_response());
     }
     state
         .message_service
@@ -85,10 +82,17 @@ pub async fn get_message<MS: MessageService>(
         .await
         .map_err(ApiError::from)
         .map(|ref message| {
-            let message: GetMessageResponseData = message.into();
-            ApiSuccess::new(StatusCode::OK, message)
+            ApiSuccess::new(
+                StatusCode::OK,
+                GetMessageReturnType::Message(message.into()),
+            )
         })
-        .map(|r| r.into_response())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum GetMessageReturnType {
+    Message(GetMessageResponseData),
+    Info(QueueSummaryResponseData),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -191,14 +195,14 @@ mod tests {
         let state = axum::extract::State(AppState {
             message_service: Arc::new(service),
         });
-        let _expected = ApiSuccess::new(
+        let expected = ApiSuccess::new(
             StatusCode::OK,
-            GetMessageResponseData {
+            GetMessageReturnType::Message(GetMessageResponseData {
                 mid: message_id.to_string(),
                 cid: None,
                 cursor: 0,
                 content: content.clone(),
-            },
+            }),
         );
 
         let path = axum::extract::Path("test".to_string());
@@ -212,11 +216,11 @@ mod tests {
             actual
         );
 
-        let _actual = actual.unwrap();
-        //assert_eq!(
-        //actual, expected,
-        //"expected ApiSuccess {:?}, but got {:?}",
-        //expected, actual
-        //)
+        let actual = actual.unwrap();
+        assert_eq!(
+            actual, expected,
+            "expected ApiSuccess {:?}, but got {:?}",
+            expected, actual
+        )
     }
 }
