@@ -136,6 +136,7 @@ mod tests {
         CreateMessageError, CreateMessageRequest, QueueList, QueueListError, QueueName,
     };
     use anyhow::anyhow;
+    use serde_json;
     use std::mem;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
@@ -206,21 +207,11 @@ mod tests {
         );
 
         let path = axum::extract::Path("test".to_string());
-        let mut gmo = HashMap::new();
-        gmo.insert("action".to_string(), "browse".to_string());
+        let gmo = serde_json::from_str(r#"{"action":"browse"}"#).unwrap();
 
-        let actual = get_message(state, path, axum::extract::Query(gmo)).await;
-        assert!(
-            actual.is_ok(),
-            "expected create_message to succeed, but got {:?}",
-            actual
-        );
-
-        let actual = actual.unwrap();
-        assert_eq!(
-            actual, expected,
-            "expected ApiSuccess {:?}, but got {:?}",
-            expected, actual
-        )
+        let actual = get_message(state, path, axum::extract::Query(gmo))
+            .await
+            .unwrap();
+        assert_eq!(actual, expected)
     }
 }

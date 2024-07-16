@@ -384,6 +384,7 @@ dependencies = [
  "axum",
  "derive_more",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tower-http",
