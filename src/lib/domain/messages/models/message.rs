@@ -127,12 +127,14 @@ impl GetMessageOptions {
                     && !msg.is_expired()
                     && (self.mid.is_none() || msg.mid == self.mid.unwrap())
                     && (self.cid.is_none() || msg.cid == self.cid)
+                    && (self.cursor.is_none() || msg.cursor > self.cursor.unwrap())
             }
             GetMessageAction::Get => {
                 !msg.is_reserved()
                     && !msg.is_expired()
                     && (self.mid.is_none() || msg.mid == self.mid.unwrap())
                     && (self.cid.is_none() || msg.cid == self.cid)
+                    && (self.cursor.is_none() || msg.cursor > self.cursor.unwrap())
             }
             GetMessageAction::Confirm => msg.is_reserved() && msg.mid == self.mid.unwrap(),
             GetMessageAction::Reserve => {
@@ -140,6 +142,7 @@ impl GetMessageOptions {
                     && !msg.is_expired()
                     && (self.mid.is_none() || msg.mid == self.mid.unwrap())
                     && (self.cid.is_none() || msg.cid == self.cid)
+                    && (self.cursor.is_none() || msg.cursor > self.cursor.unwrap())
             }
             GetMessageAction::Return => msg.is_reserved() && msg.mid == self.mid.unwrap(),
             GetMessageAction::Query => unreachable!(),
@@ -195,11 +198,11 @@ impl TryFrom<HashMap<String, String>> for GetMessageOptions {
                     })?,
             ),
         };
-        let cursor = match m.get("cursor") {
+        let cursor = match m.get("after") {
             None => None,
             Some(s) => Some(
                 s.parse()
-                    .map_err(|_| GetMessageError::InvalidParameter("cursor".to_string()))?,
+                    .map_err(|_| GetMessageError::InvalidParameter("after".to_string()))?,
             ),
         };
         let gmo = Self {

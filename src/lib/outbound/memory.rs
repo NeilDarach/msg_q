@@ -430,4 +430,60 @@ mod tests {
         assert!(fail.is_err());
         assert_eq!(depth(&store, "queue1").await, 3);
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_browse_after() {
+        let store = Memory::new().await.unwrap();
+        let req = CreateMessageRequest::new("msg1".to_string(), None);
+        let msg1 = store
+            .create_message("queue1".to_string().try_into().unwrap(), &req.clone())
+            .await
+            .unwrap();
+        let msg2 = store
+            .create_message("queue1".to_string().try_into().unwrap(), &req)
+            .await
+            .unwrap();
+        let gmo = gmo!(r#"{{"action":"browse","queue_name":"queue1"}}"#,);
+        let msg_r1 = store.get_message(gmo.clone()).await;
+        assert!(msg_r1.is_ok());
+        let msg_r1 = msg_r1.unwrap();
+        assert_eq!(msg_r1, msg1);
+
+        let gmo = gmo!(
+            r#"{{"action":"browse","queue_name":"queue1","after":"{}"}}"#,
+            msg_r1.cursor()
+        );
+        let msg_r2 = store.get_message(gmo.clone()).await;
+        assert!(msg_r2.is_ok());
+        let msg_r2 = msg_r2.unwrap();
+        assert_eq!(msg_r2, msg2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_after() {
+        let store = Memory::new().await.unwrap();
+        let req = CreateMessageRequest::new("msg1".to_string(), None);
+        let msg1 = store
+            .create_message("queue1".to_string().try_into().unwrap(), &req.clone())
+            .await
+            .unwrap();
+        let msg2 = store
+            .create_message("queue1".to_string().try_into().unwrap(), &req)
+            .await
+            .unwrap();
+        let gmo = gmo!(r#"{{"action":"browse","queue_name":"queue1"}}"#,);
+        let msg_r1 = store.get_message(gmo.clone()).await;
+        assert!(msg_r1.is_ok());
+        let msg_r1 = msg_r1.unwrap();
+        assert_eq!(msg_r1, msg1);
+
+        let gmo = gmo!(
+            r#"{{"action":"get","queue_name":"queue1","after":"{}"}}"#,
+            msg_r1.cursor()
+        );
+        let msg_r2 = store.get_message(gmo.clone()).await;
+        assert!(msg_r2.is_ok());
+        let msg_r2 = msg_r2.unwrap();
+        assert_eq!(msg_r2, msg2);
+    }
 }
