@@ -193,7 +193,7 @@ mod tests {
     async fn test_get_message_success() {
         let content = "A String".to_string();
         let message_id = Uuid::new_v4();
-        let response = Ok(Message::new(message_id, None, content.clone()));
+        let response = Ok(Message::new(message_id, None, content.clone(), None));
         let expected = ApiSuccess::new(
             StatusCode::OK,
             GetMessageReturnType::Message(GetMessageResponseData {
@@ -212,7 +212,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_message_bad_mid() {
-        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
+        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string(), None));
         let expected = ApiError::UnprocessableEntity("Bad parameter mid".to_string());
         let actual = get("test", r#"{"action":"browse","mid":"xxx"}"#, &response).await;
         assert_eq!(actual, Err(expected));
@@ -228,7 +228,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_get_message_bad_reservation() {
-        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
+        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string(), None));
         let expected =
             ApiError::UnprocessableEntity("Bad parameter reservation_seconds".to_string());
         let actual = get(

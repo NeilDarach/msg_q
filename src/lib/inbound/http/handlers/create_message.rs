@@ -3,8 +3,14 @@ use std::fmt::Display;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+#[cfg(test)]
+use mock_instant::global::Instant;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use thiserror::Error;
+
+#[cfg(not(test))]
+use std::time::Instant;
 
 use crate::domain::messages::models::message::{
     CreateMessageError, CreateMessageRequest, Message, QueueNameEmptyError,
@@ -30,6 +36,7 @@ impl From<CreateMessageError> for ApiError {
 pub struct CreateMessageRequestBody {
     cid: Option<String>,
     content: String,
+    expiry_seconds: Option<String>,
 }
 
 impl CreateMessageRequestBody {
@@ -42,7 +49,16 @@ impl CreateMessageRequestBody {
                     .map_err(|_| ParseCreateMessageHttpRequestError::BadUuid(s.to_string()))?,
             ),
         };
-        Ok(CreateMessageRequest::new(content.clone(), cid))
+        let expiry = match &self.expiry_seconds {
+            None => None,
+            Some(s) => {
+                let secs = s
+                    .parse()
+                    .map_err(|_| ParseCreateMessageHttpRequestError::BadExpiry(s.to_string()))?;
+                Some(Instant::now() + Duration::from_secs(secs))
+            }
+        };
+        Ok(CreateMessageRequest::new(content.clone(), cid, expiry))
     }
 }
 
@@ -51,6 +67,7 @@ enum ParseCreateMessageHttpRequestError {
     #[error(transparent)]
     QueueName(#[from] QueueNameEmptyError),
     BadUuid(String),
+    BadExpiry(String),
 }
 
 impl Display for ParseCreateMessageHttpRequestError {
@@ -67,6 +84,9 @@ impl From<ParseCreateMessageHttpRequestError> for ApiError {
             }
             ParseCreateMessageHttpRequestError::BadUuid(s) => {
                 format!("{} cannot be parsed to a Uuid", s)
+            }
+            ParseCreateMessageHttpRequestError::BadExpiry(s) => {
+                format!("{} cannot be parsed to an integer", s)
             }
         };
         Self::UnprocessableEntity(message)

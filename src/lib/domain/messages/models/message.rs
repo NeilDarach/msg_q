@@ -279,21 +279,35 @@ pub enum Expiry {
 impl From<Option<Instant>> for Reservation {
     fn from(i: Option<Instant>) -> Reservation {
         match i {
-            None => Reservation::Unreserved,
-            Some(i) => Reservation::Until(i),
+            None => Self::Unreserved,
+            Some(i) => Self::Until(i),
+        }
+    }
+}
+
+impl From<Option<Instant>> for Expiry {
+    fn from(i: Option<Instant>) -> Expiry {
+        match i {
+            None => Self::Permanent,
+            Some(i) => Self::Expire(i),
         }
     }
 }
 
 impl Message {
-    pub fn new(mid: uuid::Uuid, cid: Option<uuid::Uuid>, content: String) -> Self {
+    pub fn new(
+        mid: uuid::Uuid,
+        cid: Option<uuid::Uuid>,
+        content: String,
+        expiry: Option<Instant>,
+    ) -> Self {
         Self {
             mid,
             cid,
             content,
             cursor: 0,
             reservation: Reservation::Unreserved,
-            expiry: Expiry::Permanent,
+            expiry: expiry.into(),
         }
     }
 
@@ -393,11 +407,16 @@ pub struct QueueList(pub Vec<String>);
 pub struct CreateMessageRequest {
     content: String,
     cid: Option<uuid::Uuid>,
+    expiry: Option<Instant>,
 }
 
 impl CreateMessageRequest {
-    pub fn new(content: String, cid: Option<uuid::Uuid>) -> Self {
-        Self { cid, content }
+    pub fn new(content: String, cid: Option<uuid::Uuid>, expiry: Option<Instant>) -> Self {
+        Self {
+            cid,
+            content,
+            expiry,
+        }
     }
 
     pub fn cid(&self) -> Option<&uuid::Uuid> {
@@ -406,6 +425,10 @@ impl CreateMessageRequest {
 
     pub fn content(&self) -> &String {
         &self.content
+    }
+
+    pub fn expiry(&self) -> Option<&Instant> {
+        self.expiry.as_ref()
     }
 }
 
