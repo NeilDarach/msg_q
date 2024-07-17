@@ -14,6 +14,7 @@ path = "src/bin/server/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
+mock_instant = "0.5.1"
 serde_json = "1.0.120"
 
 [dependencies]

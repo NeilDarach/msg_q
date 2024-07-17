@@ -2,8 +2,14 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use uuid::Uuid;
+
+#[cfg(test)]
+use mock_instant::global::Instant;
+
+#[cfg(not(test))]
+use std::time::Instant;
 
 use derive_more::From;
 use thiserror::Error;
@@ -120,23 +126,23 @@ impl GetMessageOptions {
                 !msg.is_reserved()
                     && !msg.is_expired()
                     && (self.mid.is_none() || msg.mid == self.mid.unwrap())
-                    && (self.cid.is_none() || msg.mid == self.cid.unwrap())
+                    && (self.cid.is_none() || msg.cid == self.cid)
             }
             GetMessageAction::Get => {
                 !msg.is_reserved()
                     && !msg.is_expired()
                     && (self.mid.is_none() || msg.mid == self.mid.unwrap())
-                    && (self.cid.is_none() || msg.mid == self.cid.unwrap())
+                    && (self.cid.is_none() || msg.cid == self.cid)
             }
             GetMessageAction::Confirm => msg.is_reserved() && msg.mid == self.mid.unwrap(),
             GetMessageAction::Reserve => {
                 !msg.is_reserved()
                     && !msg.is_expired()
                     && (self.mid.is_none() || msg.mid == self.mid.unwrap())
-                    && (self.cid.is_none() || msg.mid == self.cid.unwrap())
+                    && (self.cid.is_none() || msg.cid == self.cid)
             }
             GetMessageAction::Return => msg.is_reserved() && msg.mid == self.mid.unwrap(),
-            GetMessageAction::Query => todo!(),
+            GetMessageAction::Query => unreachable!(),
         }
     }
 }

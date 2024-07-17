@@ -84,7 +84,7 @@ impl MessageRepository for Memory {
         let mid = Uuid::new_v4();
         let mut queues = self.queues.lock().unwrap();
         let content = req.content().clone();
-        let message = Message::new(mid, None, content);
+        let message = Message::new(mid, req.cid().copied(), content);
         let entry = queues.entry(queue_name.clone()).or_default();
         Ok(entry.add_message(message))
     }
@@ -113,6 +113,9 @@ impl MessageRepository for Memory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mock_instant::global::MockClock;
+    use std::time::Duration;
+
     use serde_json;
 
     macro_rules! gmo {
@@ -289,6 +292,44 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_browse_cid_message() {
+        let mut store = Memory::new().await.unwrap();
+        let cid = Uuid::new_v4().to_string();
+        let _msg1 = put(&mut store, "queue1", "msg1", None).await.unwrap();
+        let msg2 = put(&mut store, "queue1", "msg2", Some(&cid)).await.unwrap();
+        let _msg3 = put(&mut store, "queue1", "msg3", None).await.unwrap();
+        assert_eq!(depth(&store, "queue1").await, 3);
+        let gmo = gmo!(
+            r#"{{"action":"browse","queue_name":"queue1","cid":"{}"}}"#,
+            cid
+        );
+        let msg = store.get_message(gmo.clone()).await;
+        assert!(msg.is_ok(), "{:?}", msg);
+        let msg = msg.unwrap();
+        assert_eq!(msg, msg2);
+        assert_eq!(depth(&store, "queue1").await, 3);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_cid_message() {
+        let mut store = Memory::new().await.unwrap();
+        let cid = Uuid::new_v4().to_string();
+        let _msg1 = put(&mut store, "queue1", "msg1", None).await.unwrap();
+        let msg2 = put(&mut store, "queue1", "msg2", Some(&cid)).await.unwrap();
+        let _msg3 = put(&mut store, "queue1", "msg3", None).await.unwrap();
+        assert_eq!(depth(&store, "queue1").await, 3);
+        let gmo = gmo!(
+            r#"{{"action":"get","queue_name":"queue1","cid":"{}"}}"#,
+            cid
+        );
+        let msg = store.get_message(gmo.clone()).await;
+        assert!(msg.is_ok(), "{:?}", msg);
+        let msg = msg.unwrap();
+        assert_eq!(msg, msg2);
+        assert_eq!(depth(&store, "queue1").await, 2);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_confirm_message() {
         let mut store = Memory::new().await.unwrap();
         let _msg1 = put(&mut store, "queue1", "msg1", None).await.unwrap();
@@ -344,5 +385,35 @@ mod tests {
         assert!(msg.is_ok());
         let msg = msg.unwrap();
         assert_eq!(msg.content(), &"msg2".to_string());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_expired_reservation() {
+        let mut store = Memory::new().await.unwrap();
+        let _msg1 = put(&mut store, "queue1", "msg1", None).await.unwrap();
+        let msg2 = put(&mut store, "queue1", "msg2", None).await.unwrap();
+        let _msg3 = put(&mut store, "queue1", "msg3", None).await.unwrap();
+        assert_eq!(depth(&store, "queue1").await, 3);
+        let reserve_gmo = gmo!(
+            r#"{{"action":"reserve","queue_name":"queue1","mid":"{}","reservation_seconds":"10"}}"#,
+            msg2.mid()
+        );
+        let browse_gmo = gmo!(
+            r#"{{"action":"browse","queue_name":"queue1","mid":"{}"}}"#,
+            msg2.mid()
+        );
+        let msg = store.get_message(reserve_gmo.clone()).await;
+        assert!(msg.is_ok());
+        let msg = msg.unwrap();
+        assert_eq!(msg.content(), &"msg2".to_string());
+        assert_eq!(depth(&store, "queue1").await, 3);
+
+        let fail = store.get_message(browse_gmo.clone()).await;
+        assert!(fail.is_err());
+        MockClock::advance(Duration::from_secs(15));
+
+        let msg = store.get_message(browse_gmo.clone()).await;
+        assert!(msg.is_ok());
+        assert_eq!(depth(&store, "queue1").await, 3);
     }
 }

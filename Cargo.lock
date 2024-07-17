@@ -377,12 +377,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock_instant"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdcebb6db83796481097dedc7747809243cc81d9ed83e6a938b76d4ea0b249cf"
+
+[[package]]
 name = "msg_q"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
  "derive_more",
+ "mock_instant",
  "serde",
  "serde_json",
  "thiserror",
