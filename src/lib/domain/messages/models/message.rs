@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
@@ -226,13 +227,18 @@ impl QueueSummary {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum QueueSummaryError {
     #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+    Unknown(Arc<anyhow::Error>),
     NoQueue(String),
 }
 
+impl From<anyhow::Error> for QueueSummaryError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Unknown(Arc::new(value))
+    }
+}
 impl Display for QueueSummaryError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str("QueueSummaryError")
@@ -394,11 +400,16 @@ impl CreateMessageRequest {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum CreateMessageError {
     BadQueue(String),
     #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+    Unknown(Arc<anyhow::Error>),
+}
+impl From<anyhow::Error> for CreateMessageError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Unknown(Arc::new(value))
+    }
 }
 
 impl Display for CreateMessageError {
@@ -407,20 +418,30 @@ impl Display for CreateMessageError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum QueueListError {
     #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+    Unknown(Arc<anyhow::Error>),
+}
+impl From<anyhow::Error> for QueueListError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Unknown(Arc::new(value))
+    }
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum GetMessageError {
     BadUuid(String),
     NoMessage(String),
     MissingParameter(String),
     InvalidParameter(String),
-    #[error(transparent)]
-    Unknown(#[from] anyhow::Error),
+    Unknown(Arc<anyhow::Error>),
+}
+
+impl From<anyhow::Error> for GetMessageError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Unknown(Arc::new(value))
+    }
 }
 
 impl Display for GetMessageError {

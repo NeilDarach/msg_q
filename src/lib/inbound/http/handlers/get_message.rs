@@ -155,7 +155,9 @@ mod tests {
 
         pub fn get(&self) -> Result<Message, GetMessageError> {
             let mut guard = self.get_message_result.lock();
-            let mut result = Err(GetMessageError::Unknown(anyhow!("substitute error")));
+            let mut result = Err(GetMessageError::Unknown(Arc::new(anyhow!(
+                "substitute error"
+            ))));
             let t = guard.as_deref_mut().unwrap().as_mut().unwrap();
             mem::swap(t, &mut result);
 
@@ -201,7 +203,7 @@ mod tests {
                 content: content.clone(),
             }),
         );
-        let actual = get("test", r#"{"action":"browse"}"#, response)
+        let actual = get("test", r#"{"action":"browse"}"#, &response)
             .await
             .unwrap();
 
@@ -212,14 +214,13 @@ mod tests {
     async fn test_get_message_bad_mid() {
         let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
         let expected = ApiError::UnprocessableEntity("Bad parameter mid".to_string());
-        let actual = get("test", r#"{"action":"browse","mid":"xxx"}"#, response).await;
+        let actual = get("test", r#"{"action":"browse","mid":"xxx"}"#, &response).await;
         assert_eq!(actual, Err(expected));
 
-        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
         let actual = get(
             "test",
             r#"{"action":"browse","mid":"61fb8b36-c7e6-4a34-af8a-011a73f065f0"}"#,
-            response,
+            &response,
         )
         .await;
         assert!(actual.is_ok(), "{:?}", actual);
@@ -233,27 +234,25 @@ mod tests {
         let actual = get(
             "test",
             r#"{"action":"get","reservation_seconds":"xxx"}"#,
-            response,
+            &response,
         )
         .await;
         assert_eq!(actual, Err(expected));
 
-        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
         let expected =
             ApiError::UnprocessableEntity("Bad parameter reservation_seconds".to_string());
         let actual = get(
             "test",
             r#"{"action":"browse","reservation_seconds":"10"}"#,
-            response,
+            &response,
         )
         .await;
         assert_eq!(actual, Err(expected));
 
-        let response = Ok(Message::new(Uuid::new_v4(), None, "".to_string()));
         let actual = get(
             "test",
             r#"{"action":"get","reservation_seconds":"10"}"#,
-            response,
+            &response,
         )
         .await;
         assert!(actual.is_ok(), "{:?}", actual);
@@ -262,9 +261,9 @@ mod tests {
     async fn get(
         path: &str,
         gmo: &str,
-        response: Result<Message, GetMessageError>,
+        response: &Result<Message, GetMessageError>,
     ) -> Result<ApiSuccess<GetMessageReturnType>, ApiError> {
-        let service = MockMessageService::new_get(response);
+        let service = MockMessageService::new_get(response.clone());
         let state = axum::extract::State(AppState {
             message_service: Arc::new(service),
         });
