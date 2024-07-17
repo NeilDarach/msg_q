@@ -392,28 +392,42 @@ mod tests {
         let mut store = Memory::new().await.unwrap();
         let _msg1 = put(&mut store, "queue1", "msg1", None).await.unwrap();
         let msg2 = put(&mut store, "queue1", "msg2", None).await.unwrap();
-        let _msg3 = put(&mut store, "queue1", "msg3", None).await.unwrap();
+        let msg3 = put(&mut store, "queue1", "msg3", None).await.unwrap();
         assert_eq!(depth(&store, "queue1").await, 3);
-        let reserve_gmo = gmo!(
+        let reserve_gmo1 = gmo!(
             r#"{{"action":"reserve","queue_name":"queue1","mid":"{}","reservation_seconds":"10"}}"#,
             msg2.mid()
         );
-        let browse_gmo = gmo!(
+        let reserve_gmo2 = gmo!(
+            r#"{{"action":"reserve","queue_name":"queue1","mid":"{}","reservation_seconds":"20"}}"#,
+            msg3.mid()
+        );
+        let browse_gmo1 = gmo!(
             r#"{{"action":"browse","queue_name":"queue1","mid":"{}"}}"#,
             msg2.mid()
         );
-        let msg = store.get_message(reserve_gmo.clone()).await;
-        assert!(msg.is_ok());
-        let msg = msg.unwrap();
-        assert_eq!(msg.content(), &"msg2".to_string());
+        let browse_gmo2 = gmo!(
+            r#"{{"action":"browse","queue_name":"queue1","mid":"{}"}}"#,
+            msg3.mid()
+        );
+        let msg_r1 = store.get_message(reserve_gmo1.clone()).await;
+        let msg_r2 = store.get_message(reserve_gmo2.clone()).await;
+        assert!(msg_r1.is_ok());
+        assert!(msg_r2.is_ok());
+        let msg_r1 = msg_r1.unwrap();
+        assert_eq!(msg_r1.content(), &"msg2".to_string());
         assert_eq!(depth(&store, "queue1").await, 3);
 
-        let fail = store.get_message(browse_gmo.clone()).await;
+        let fail = store.get_message(browse_gmo1.clone()).await;
+        assert!(fail.is_err());
+        let fail = store.get_message(browse_gmo2.clone()).await;
         assert!(fail.is_err());
         MockClock::advance(Duration::from_secs(15));
 
-        let msg = store.get_message(browse_gmo.clone()).await;
+        let msg = store.get_message(browse_gmo1.clone()).await;
         assert!(msg.is_ok());
+        let fail = store.get_message(browse_gmo2.clone()).await;
+        assert!(fail.is_err());
         assert_eq!(depth(&store, "queue1").await, 3);
     }
 }
