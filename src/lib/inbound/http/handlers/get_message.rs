@@ -40,7 +40,7 @@ pub async fn get_message_mid<MS: MessageService>(
     Path((queue_name, mid)): Path<(String, String)>,
     Query(mut params): Query<HashMap<String, String>>,
 ) -> Result<ApiSuccess<GetMessageResponseData>, ApiError> {
-    if params.get("mid").is_some() {
+    if params.contains_key("mid") {
         return Err(GetMessageError::InvalidParameter("mid specified twice".to_string()).into());
     }
     params.insert("queue_name".to_string(), queue_name);
