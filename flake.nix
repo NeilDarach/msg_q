@@ -58,6 +58,16 @@
             extensions = [ "rust-src" "rustfmt" ];
           };
       };
+
+      packages = forEachSupportedSystem ({ pkgs }: {
+        default = pkgs.rustPlatform.buildRustPackage {
+          pname = "msg_q";
+          version = "0.1";
+          cargoLock.lockFile = ./Cargo.lock;
+          src = pkgs.lib.cleanSource ./.;
+        };
+      });
+
       devShells = forEachSupportedSystem ({ pkgs }: {
         default = pkgs.mkShell {
           packages = with pkgs; [ nvim rustToolchain just bacon ];
