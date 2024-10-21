@@ -42,21 +42,27 @@
               overlays = [
                 (_: _: { inherit nvim; })
                 rust-overlay.overlays.default
-                self.overlays.default
+                self.overlays.local
               ];
             };
           in f { inherit pkgs; });
     in {
-      overlays.default = final: prev: {
-        rustToolchain = let rust = prev.rust-bin;
-        in if builtins.pathExists ./rust-toolchain.toml then
-          rust.fromRustupToolchainFile ./rust-toolchain.toml
-        else if builtins.pathExists ./rust-toolchain then
-          rust.fromRustupToolchainFile ./rust-toolchain
-        else
-          rust.stable.latest.default.override {
-            extensions = [ "rust-src" "rustfmt" ];
-          };
+      overlays = {
+        msg_q = builtins.trace "loaded the overlay" (final: prev: {
+          msg_q = builtins.trace "ran the overlay"
+            self.packages.${prev.system}.default;
+        });
+        local = final: prev: {
+          rustToolchain = let rust = prev.rust-bin;
+          in if builtins.pathExists ./rust-toolchain.toml then
+            rust.fromRustupToolchainFile ./rust-toolchain.toml
+          else if builtins.pathExists ./rust-toolchain then
+            rust.fromRustupToolchainFile ./rust-toolchain
+          else
+            rust.stable.latest.default.override {
+              extensions = [ "rust-src" "rustfmt" ];
+            };
+        };
       };
 
       packages = forEachSupportedSystem ({ pkgs }: {
@@ -67,6 +73,30 @@
           src = pkgs.lib.cleanSource ./.;
         };
       });
+
+      nixosModules = {
+        msg_q = { lib, config, pkgs, ... }:
+          with lib;
+          let cfg = config.services.msg_q;
+          in {
+            options.services.msg_q = {
+              enable = mkEnableOption "msg_q";
+              port = mkOption {
+                description = "Port to listen on";
+                type = lib.types.int;
+                default = 8080;
+                example = 8080;
+              };
+            };
+            config = lib.mkIf cfg.enable {
+              systemd.services.msg_q = {
+                wantedBy = [ "multi-user.target" ];
+                serviceConfig.ExecStart = "${pkgs.msg_q}/bin/msg_q_server";
+                environment = { SERVER_PORT = builtins.toString cfg.port; };
+              };
+            };
+          };
+      };
 
       devShells = forEachSupportedSystem ({ pkgs }: {
         default = pkgs.mkShell {
