@@ -67,9 +67,10 @@
       };
 
       packages = forEachSupportedSystem ({ pkgs }: {
-        default = pkgs.rustPlatform.buildRustPackage {
-          pname = "msg_q";
-          version = "0.1";
+        default = let manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
+        in pkgs.rustPlatform.buildRustPackage {
+          pname = manifest.name;
+          version = manifest.version;
           cargoLock.lockFile = ./Cargo.lock;
           src = pkgs.lib.cleanSource ./.;
         };
