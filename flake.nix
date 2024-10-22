@@ -48,6 +48,7 @@
           in f { inherit pkgs; });
     in {
       overlays = {
+        default = self.overlays.msg_q;
         msg_q = builtins.trace "loaded the overlay" (final: prev: {
           msg_q = builtins.trace "ran the overlay"
             self.packages.${prev.system}.default;
@@ -81,6 +82,13 @@
           in {
             options.services.msg_q = {
               enable = mkEnableOption "msg_q";
+              openFirewall = mkOption {
+                description =
+                  "Allow external access by allowing the port through the firewall";
+                type = lib.types.bool;
+                default = false;
+                example = true;
+              };
               port = mkOption {
                 description = "Port to listen on";
                 type = lib.types.int;
@@ -89,6 +97,9 @@
               };
             };
             config = lib.mkIf cfg.enable {
+
+              networking.firewall.allowedTCPPorts =
+                lib.mkIf cfg.openFirewall [ cfg.port ];
               systemd.services.msg_q = {
                 wantedBy = [ "multi-user.target" ];
                 serviceConfig.ExecStart = "${pkgs.msg_q}/bin/msg_q_server";
