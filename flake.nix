@@ -10,7 +10,7 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
   outputs = { self, nixpkgs, flake-utils, nixNvim, rust-overlay, ... }@inputs:
-    flake-utils.lib.eachDefaultSystem (system:
+    (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -36,6 +36,18 @@
             src = pkgs.lib.cleanSource ./.;
           };
 
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            pkgs.rust-analyzer
+            rustToolchain
+            just
+            bacon
+          ];
+          env = {
+            RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+          };
+        };
+      })) // {
         nixosModules = {
           msg_q = { lib, config, pkgs, ... }:
             with lib;
@@ -68,13 +80,5 @@
               };
             };
         };
-
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [ pkgs.rust-analyzer rustToolchain just bacon ];
-          env = {
-            RUST_SRC_PATH =
-              "${rustToolchain}/lib/rustlib/src/rust/library";
-          };
-        };
-      });
+      };
 }
